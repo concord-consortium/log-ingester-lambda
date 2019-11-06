@@ -4,22 +4,37 @@ This code is stored in a .zip file hosted at S3 in the `concord-devops/log-inges
 
 ## Updating the live code
 
-1. Make your source changes
-2. Uncomment the test code at the bottom of the index.js file to test your changes
-3. Create the .zip file using:
-
 ```
 cd log-ingester-lambda
-zip -r9 ../kinesis-to-rds-VERSION.zip
+./makezip.sh <version>
 ```
 
-4. Upload the .zip file to the `concord-devops/log-ingester` bucket.
-5. Update the `S3Key` in the `log-ingester.yml` here:
+this will create `kinesis-to-rds-<version>.zip`.  Then upload the .zip file to the `concord-devops/log-ingester` bucket
+and update the `LambdaZipFilename` parameter in the log-ingester stack in the AWS console and redeploy.
+
+## Testing the Lambda function
+
+Once the code is deployed you can use the following payload to test the function in the AWS console:
 
 ```
-Code:
-  S3Bucket: concord-devops
-  S3Key: log-ingester/kinesis-to-rds-VERSION.zip
+{
+    "Records": [
+        {
+            "kinesis": {
+                "kinesisSchemaVersion": "1.0",
+                "partitionKey": "todo",
+                "sequenceNumber": "49592726167714857316135803118515680514645498297090834434",
+                "data": "O3sic2Vzc2lvbiI6InRlc3QiLCJ1c2VybmFtZSI6ImRtYXJ0aW4ifQ==",
+                "approximateArrivalTimestamp": 1549473921.272
+            },
+            "eventSource": "aws:kinesis",
+            "eventVersion": "1.0",
+            "eventID": "shardId-000000000000:49592726167714857316135803118515680514645498297090834434",
+            "eventName": "aws:kinesis:record",
+            "invokeIdentityArn": "arn:aws:iam::612297603577:role/log-ingester-staging-kinesis-lambda",
+            "awsRegion": "us-east-1",
+            "eventSourceARN": "arn:aws:kinesis:us-east-1:612297603577:stream/log-ingester-staging-api-gateway-stream"
+        }
+    ]
+  }
 ```
-
-6. Commit your `log-ingester.yml` changes and update the stack(s) in the AWS console.

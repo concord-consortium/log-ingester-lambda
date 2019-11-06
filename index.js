@@ -19,13 +19,15 @@ const canonicalize = (rawData, timestamp) => {
 };
 
 exports.handler = async (event) => {
+  let client = null;
+
   try {
     const connectionString = process.env.RDS_DATABASE_URL;
     if (!connectionString) {
       throw new Error("Missing RDS_DATABASE_URL environment variable");
     }
 
-    const client = new Client({connectionString});
+    client = new Client({connectionString, statement_timeout: 1000*10});
     await client.connect();
 
     console.log(`Event Received: ${JSON.stringify(event)}`);
@@ -55,43 +57,23 @@ exports.handler = async (event) => {
 
     const output = await Promise.all(results);
 
+    console.log(`Insertion results: ${JSON.stringify(output)}`);
+
     return {
       statusCode: 200,
       body: JSON.stringify(output),
     }
   }
   catch (err) {
+    console.error(`Error: ${err.toString()}`);
     return {
       statusCode: 400, // can't be 500 as that is not part of the CloudWatch Errors metric for Lambda functions
       body: JSON.stringify({error: err.toString()})
     }
   }
+  finally {
+    if (client) {
+      client.end();
+    }
+  }
 };
-
-// TEST DATA
-// const foo = {"session": "test: session", "username": "test: username", "application": "test: application", "activity": "test: activity", "event": "test: event", "parameters": {"p1": "test p1", "p2": "test p2"}, "event_value": "test: event_value", "run_remote_endpoint": "test: run_remote_endpoint", "foo": "bar", "baz": "bam"}
-// 1549454904899;{"session": "test: session", "username": "test: username", "application": "test: application", "activity": "test: activity", "event": "test: event", "parameters": {"p1": "test p1", "p2": "test p2"}, "event_value": "test: event_value", "run_remote_endpoint": "test: run_remote_endpoint", "foo": "bar", "baz": "bam"}
-
-// TEST (will run but then not exit because node sees it is a module)
-// const event = {Records: [{kinesis: {data: "MTU0OTQ1NDkwNDg5OTt7InNlc3Npb24iOiAidGVzdDogc2Vzc2lvbiIsICJ1c2VybmFtZSI6ICJ0ZXN0OiB1c2VybmFtZSIsICJhcHBsaWNhdGlvbiI6ICJ0ZXN0OiBhcHBsaWNhdGlvbiIsICJhY3Rpdml0eSI6ICJ0ZXN0OiBhY3Rpdml0eSIsICJldmVudCI6ICJ0ZXN0OiBldmVudCIsICJwYXJhbWV0ZXJzIjogeyJwMSI6ICJ0ZXN0IHAxIiwgInAyIjogInRlc3QgcDIifSwgImV2ZW50X3ZhbHVlIjogInRlc3Q6IGV2ZW50X3ZhbHVlIiwgInJ1bl9yZW1vdGVfZW5kcG9pbnQiOiAidGVzdDogcnVuX3JlbW90ZV9lbmRwb2ludCIsICJmb28iOiAiYmFyIiwgImJheiI6ICJiYW0ifQ=="}}]}
-// const event = {
-//   "Records": [
-//       {
-//           "kinesis": {
-//               "kinesisSchemaVersion": "1.0",
-//               "partitionKey": "todo",
-//               "sequenceNumber": "49592726167714857316135803118515680514645498297090834434",
-//               "data": "O3sic2Vzc2lvbiI6InRlc3QiLCJ1c2VybmFtZSI6ImRtYXJ0aW4ifQ==",
-//               "approximateArrivalTimestamp": 1549473921.272
-//           },
-//           "eventSource": "aws:kinesis",
-//           "eventVersion": "1.0",
-//           "eventID": "shardId-000000000000:49592726167714857316135803118515680514645498297090834434",
-//           "eventName": "aws:kinesis:record",
-//           "invokeIdentityArn": "arn:aws:iam::612297603577:role/log-ingester-staging-kinesis-lambda",
-//           "awsRegion": "us-east-1",
-//           "eventSourceARN": "arn:aws:kinesis:us-east-1:612297603577:stream/log-ingester-staging-api-gateway-stream"
-//       }
-//   ]
-// };
-// exports.handler(event).then(console.log).catch(console.error)
